@@ -1,0 +1,43 @@
+name: Pre-Market News Digest
+
+on:
+  schedule:
+    - cron: "45 5 * * 1-5"
+  workflow_dispatch: {}
+
+jobs:
+  send-digest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run news digest script
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          LOOKBACK_HOURS: "14"
+          KEYWORDS: ""
+        run: python news_to_telegram.py
+
+      - name: Run economic calendar script
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          CALENDAR_TIMEZONE: "Europe/Helsinki"
+          MIN_IMPACT: "medium"
+        run: python economic_calendar_to_telegram.py
+
+      - name: Commit updated dedupe state
+        run: |
+          git config user.name "news-bot"
+          git config user.email "news-bot@users.noreply.github.com"
+          git add seen_articles.json || true
+          git diff --cached --quiet || git commit -m "update seen articles state"
+          git push
