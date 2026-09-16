@@ -14,7 +14,6 @@ Env vars required:
 Optional:
     CALENDAR_TIMEZONE    - IANA tz name, default "Europe/Helsinki"
     MIN_IMPACT           - "medium" (default, includes High) or "high" (High only)
-    NO_TRADE_WINDOW_MIN  - minutes before/after each event to avoid trading, default 5
 """
 
 import os
@@ -29,7 +28,6 @@ BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 TZ_NAME = os.environ.get("CALENDAR_TIMEZONE", "Europe/Helsinki")
 MIN_IMPACT = os.environ.get("MIN_IMPACT", "medium").lower()
-NO_TRADE_WINDOW_MIN = int(os.environ.get("NO_TRADE_WINDOW_MIN", "5"))
 
 IMPACT_ORDER = {"low": 0, "medium": 1, "high": 2, "holiday": -1}
 IMPACT_EMOJI = {"medium": "🟠", "high": "🔴"}
@@ -63,18 +61,12 @@ def format_digest(events, today_local):
 
     events = sorted(events, key=lambda e: datetime.fromisoformat(e["date"]))
     date_label = today_local.strftime("%A, %d %B %Y")
-    window = NO_TRADE_WINDOW_MIN
-    header = (
-        f"*Economic Calendar — Medium/High Impact*\n{date_label} ({TZ_NAME})\n"
-        f"⛔ _No-trade window: {window} min before/after each event below_"
-    )
+    header = f"*Economic Calendar — Medium/High Impact*\n{date_label} ({TZ_NAME})"
 
     blocks = []
     for e in events:
         dt = datetime.fromisoformat(e["date"]).astimezone(TZ)
         time_str = dt.strftime("%H:%M")
-        window_start = (dt - timedelta(minutes=window)).strftime("%H:%M")
-        window_end = (dt + timedelta(minutes=window)).strftime("%H:%M")
         impact = e.get("impact", "").lower()
         emoji = IMPACT_EMOJI.get(impact, "⚪")
         currency = e.get("country", "")
@@ -90,7 +82,6 @@ def format_digest(events, today_local):
             extra.append(f"p: {previous}")
         if extra:
             line += f"  _({', '.join(extra)})_"
-        line += f"\n   ⛔ no-trade `{window_start}–{window_end}`"
         blocks.append(line)
 
     return header + "\n\n" + "\n\n".join(blocks)
@@ -115,12 +106,8 @@ def format_weekly_digest(events, monday, friday):
         return None
 
     events = sorted(events, key=lambda e: datetime.fromisoformat(e["date"]))
-    window = NO_TRADE_WINDOW_MIN
     week_label = f"{monday.strftime('%d %b')} – {friday.strftime('%d %b %Y')}"
-    header = (
-        f"*Week Ahead — Medium/High Impact*\n{week_label} ({TZ_NAME})\n"
-        f"⛔ _No-trade window: {window} min before/after each event below_"
-    )
+    header = f"*Week Ahead — Medium/High Impact*\n{week_label} ({TZ_NAME})"
 
     by_day = {}
     for e in events:
@@ -133,15 +120,12 @@ def format_weekly_digest(events, monday, friday):
         event_lines = []
         for dt, e in by_day[day]:
             time_str = dt.strftime("%H:%M")
-            window_start = (dt - timedelta(minutes=window)).strftime("%H:%M")
-            window_end = (dt + timedelta(minutes=window)).strftime("%H:%M")
             impact = e.get("impact", "").lower()
             emoji = IMPACT_EMOJI.get(impact, "⚪")
             currency = e.get("country", "")
             title = e.get("title", "Untitled").replace("*", "").replace("_", "")
 
             line = f"{emoji} `{time_str}` *{currency}* — {title}"
-            line += f"\n   ⛔ no-trade `{window_start}–{window_end}`"
             event_lines.append(line)
 
         day_blocks.append(f"*{day_label}*\n\n" + "\n\n".join(event_lines))
